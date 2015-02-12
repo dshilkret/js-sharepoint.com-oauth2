@@ -187,7 +187,7 @@ oauth2.prototype._getAccessToken = function(code, action) {
       self._updateToken(JSON.parse(xhr.response));
       accessToken = this.accessToken;
       typeToken   = this.typeToken;
-      action.thenFns.forEach(function(thenFn) { thenFn.call(self, accessToken, typeToken) });
+      action.callThenFns(self, [accessToken, typeToken]);
     }
 
     xhr.onerror = function() {
@@ -203,7 +203,7 @@ oauth2.prototype._getAccessToken = function(code, action) {
   }
 
   setTimeout(function() {
-    action.thenFns.forEach(function(thenFn) { thenFn.call(self, accessToken, typeToken); });
+    action.callThenFns(self, [accessToken, typeToken]);
   }, 100);
 }
 
@@ -213,7 +213,20 @@ oauth2.prototype._getAccessToken = function(code, action) {
 oauth2.prototype._createAction = function() {
   var a = {};
   a.thenFns = [];
-  a.then = function(fn) { this.thenFns.push(fn); }
+  a.elseFns = [];
+  a.then = function(fn) { this.thenFns.push(fn); return this; }
+  a.else = function(fn) { this.elseFns.push(fn); return this; }
+
+  a.callThenFns = function(scope, args) {
+    args = args || [];
+    this.thenFns.forEach(function(fn) { fn.apply(scope, args); });
+  }
+
+  a.callElseFns = function(scope, args) {
+    args = args || [];
+    this.elseFns.forEach(function(fn) { fn.apply(scope, args); });
+  }
+
   return a;
 }
 
@@ -253,30 +266,42 @@ oauth2.prototype.getToken = function(resource, action) {
 /**
  * @public function
  */
-oauth2.prototype.query = function(query, callback, noRepeat) {
+oauth2.prototype.query = function(method, query, action) {
+  action = action || this._createAction();
+
   var self = this;
   var url  = this.set.resource + '/_api/v1.0/' + query;
 
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
+  xhr.open(method, url, true);
   xhr.setRequestHeader('Authorization', this.typeToken+' '+this.accessToken);
   xhr.setRequestHeader('Accept', 'application/json');
   xhr.onload = function() {
     if (xhr.status === 200) {
-      var data = JSON.parse(xhr.response);
-      callback.call(self, data);
+      action.callThenFns(self, [JSON.parse(xhr.response)]);
       return;
     }
   }
-  xhr.onerror = function(e) {
-    if (!noRepeat) {
-      self._refreshToken(function() { self.query(query, callback, true); });
-      return;
+
+  xhr.onreadystatechange = function(e) {
+    /**
+     * No tiene privilegios para ejecutar
+     * esta opción.
+     */
+    if (e.target.readyState === 4 && e.target.status === 401) {
+      action.callElseFns(self, [e]);
     }
+  }
+
+  xhr.onerror = function(e) {
+    /**
+     * 
+     */
+    self._refreshToken(function() { self.query(method, query, action); });
   }
   xhr.send();
 
-  return this;
+  return action;
 }
 
 /**
@@ -304,17 +329,22 @@ oauth2.prototype.clear = function() {
 /**
  * @public function
  */
-oauth2.prototype.getRoot = function(callback) {
-  this.query('files/root', callback);
-  return this;
+oauth2.prototype.getRoot = function() {
+  return this.query('GET', 'files/root');
 }
 
 /**
  * @public function
  */
-oauth2.prototype.getChildren = function(id, callback) {
-  this.query('files/'+id+'/children', callback);
-  return this;
+oauth2.prototype.getChildren = function(id) {
+  return this.query('GET', 'files/'+id+'/children');
+}
+
+/**
+ * @public function
+ */
+oauth2.prototype.createFolder = function(parentId, folderName) {
+  return this.query('PUT', 'files/'+parentId+'/children/'+folderName);
 }
 
 /**
