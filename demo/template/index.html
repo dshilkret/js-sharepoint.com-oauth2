@@ -5,7 +5,7 @@
     <title>Sharepoint Office 365</title>
     <link rel="stylesheet" type="text/css" href="../css/default.css">
     <script type="text/javascript" src="../src/util.js"></script>
-    <script type="text/javascript" src="../src/o365.js"></script>
+    <script type="text/javascript" src="../src/oauth2.js"></script>
   </head>
   <body>
     <div class="screen">
@@ -15,10 +15,20 @@
         </div>
       </div>
       <div>
+        <div class="add-folder">
+          <form name="form-add-folder" onsubmit="return false;">
+            <label for="folder-name">Nombre carpeta</label>
+            <input type="text" id="folder-name" name="folder-name" placeholder="Nueva carpeta">
+            <input type="submit" name="btn-create-folder" value="Crear">
+          </form>
+        </div>
         <div class="data"></div>
       </div>
     </div>
     <script type="text/javascript">
+      var lastFolderId;
+      var oauth2;
+
       function createNode(parent) {
         var ul = parent.querySelector('ul');
         if (!ul) {
@@ -67,10 +77,13 @@
               return;
             }
 
-            self.getChildren(id, function(data) {
-              var ul = createNode(body);
-              createList.call(self, ul, data.value);
-            });
+            lastFolderId = id;
+
+            self.getChildren(id)
+                .then(function(data) {
+                  var ul = createNode(body);
+                  createList.call(self, ul, data.value);    
+                });
           }
 
           ul.appendChild(li);
@@ -78,24 +91,25 @@
       }
 
       function fnConnect() {
-        var oauth2 = new Oauth2('sharepoint');
+        oauth2 = new Oauth2('sharepoint');
         oauth2.setting(
           {
-            'client_id':     '<<client id>>',
-            'client_secret': '<<client secret>>',
+            'client_id':     'c8521d2b-f57d-4e9f-aa5c-9b7c8824fd6d',
+            'client_secret': 'Y52jyW+dHig6JcC8QazLmR2e3+dHlGCIVEaxIE2pgDg=',
             'redirect_uri':  'http://localhost:8080/response',
             'access_token':  'accessToken/',
             'refresh_token': 'refreshToken/'
           }
         );
 
-        oauth2.getToken('https://<<tenant>>.sharepoint.com')
+        oauth2.getToken('https://mrisk.sharepoint.com')
           .then(
             function() {
-              this.getRoot(function(data) {
-                var ul = createNode(document.querySelector('.data'));
-                createList.call(this, ul, [data]);
-              });
+              this.getRoot()
+                  .then(function(data) {
+                    var ul = createNode(document.querySelector('.data'));
+                    createList.call(this, ul, [data]);    
+                  });
             }
           );
       }
@@ -112,6 +126,14 @@
         btn.style.top  = (getHeight(act)/2 - getHeight(btn)/2) + 'px';
 
         btn.addEventListener('click',fnConnect);
+
+        var submit = document.querySelector('input[name=btn-create-folder]');
+        submit.onclick = function() {
+          var name = document.querySelector('#folder-name').value;
+          oauth2.createFolder(lastFolderId, name)
+                .then(function() { console.debug(arguments); })
+                .else(function() { console.debug(arguments); });
+        }
       }();
     </script>
   </body>

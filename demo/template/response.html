@@ -2,15 +2,15 @@
 <html lang="es">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8">
-    <script type="text/javascript" src="../src/o365.js"></script>
+    <script type="text/javascript" src="../src/oauth2.js"></script>
     <script type="text/javascript">
       +function() {
         /**
          * Guardamos el cde enviado desde
          * el servidor.
          */
-        var o365 = new Office365('sharepoint');
-        o365.setCode();
+        var oauth2 = new Oauth2('sharepoint');
+        oauth2.setCode();
       }();
     </script>
   </title>
