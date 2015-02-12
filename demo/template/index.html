@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <title>Sharepoint Office 365</title>
+    <link rel="stylesheet" type="text/css" href="../css/default.css">
+    <script type="text/javascript" src="../src/util.js"></script>
+    <script type="text/javascript" src="../src/o365.js"></script>
+  </head>
+  <body>
+    <div class="screen">
+      <div>
+        <div class="action">
+          <button id="btn-action">Conectar</button>
+        </div>
+      </div>
+      <div>
+        <div class="data"></div>
+      </div>
+    </div>
+    <script type="text/javascript">
+      function createNode(parent) {
+        var ul = parent.querySelector('ul');
+        if (!ul) {
+          ul = document.createElement('ul');
+          parent.innerHTML = '';
+          parent.appendChild(ul);
+        } else {
+          ul.innerHTML = '';
+        }
+        return ul;
+      }
+
+      function createList(ul, data) {
+        var self = this;
+        data.forEach(function(item) {
+          var li = document.createElement('li');
+          li.className = 'li-container';
+          li.dataset.id   = item["id"];
+          li.dataset.type = item["type"].toLowerCase();
+          li.dataset.name = item["name"];
+          var header = document.createElement('div');
+          header.className = 'li-header';
+          var body = document.createElement('div');
+          body.className = 'li-body';
+          body.style.display = 'none';
+          li.appendChild(header);
+          li.appendChild(body);
+
+          var icon  = document.createElement('span');
+          icon.className = 'li-'+item["type"].toLowerCase();
+          var title = document.createElement('span');
+          title.appendChild(document.createTextNode(item["name"]))
+          header.appendChild(icon);
+          header.appendChild(title);
+
+          header.onclick = function() {
+            var li   = this.parentNode;
+            var id   = li.dataset.id;
+            var name = li.dataset.name;
+            var body = li.querySelector('.li-body');
+            body.style.display = '';
+            body.innerHTML = '';
+
+            if (li.dataset.type === 'file') {
+              self.getDownload(id, name);
+              return;
+            }
+
+            self.getChildren(id, function(data) {
+              var ul = createNode(body);
+              createList.call(self, ul, data.value);
+            });
+          }
+
+          ul.appendChild(li);
+        });
+      }
+
+      function fnConnect() {
+        var oauth2 = new Oauth2('sharepoint');
+        oauth2.setting(
+          {
+            'client_id':     '<<client id>>',
+            'client_secret': '<<client secret>>',
+            'redirect_uri':  'http://localhost:8080/response',
+            'access_token':  'accessToken/',
+            'refresh_token': 'refreshToken/'
+          }
+        );
+
+        oauth2.getToken('https://<<tenant>>.sharepoint.com')
+          .then(
+            function() {
+              this.getRoot(function(data) {
+                var ul = createNode(document.querySelector('.data'));
+                createList.call(this, ul, [data]);
+              });
+            }
+          );
+      }
+
+      +function() {
+        var scr = document.querySelector('.screen');
+        scr.style.width  = window.innerWidth  + 'px';
+        scr.style.height = window.innerHeight + 'px';
+
+        var act = document.querySelector('.action');
+
+        var btn = document.querySelector('#btn-action');
+        btn.style.left = (getWidth(act) /2 - getWidth(btn) /2) + 'px';
+        btn.style.top  = (getHeight(act)/2 - getHeight(btn)/2) + 'px';
+
+        btn.addEventListener('click',fnConnect);
+      }();
+    </script>
+  </body>
+</html>
