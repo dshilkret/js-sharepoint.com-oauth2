@@ -64,6 +64,16 @@
           header.appendChild(icon);
           header.appendChild(title);
 
+          if (item["type"].toLowerCase() === 'file') {
+            var del = document.createElement('span');
+            del.dataset.id = item["id"];
+            del.appendChild(document.createTextNode('Eliminar'));
+            header.appendChild(del);
+            del.onclick = function() {
+              self.delFile(this.id);
+            }
+          }
+
           header.onclick = function() {
             var li   = this.parentNode;
             var id   = li.dataset.id;

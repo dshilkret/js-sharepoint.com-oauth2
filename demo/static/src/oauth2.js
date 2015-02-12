@@ -238,6 +238,7 @@ oauth2.prototype.getToken = function(resource, action) {
 
   // Guardamos el resource en el setting.
   this.set.resource = resource;
+  this.path = '/_api/v1.0/' + (/\-my/.test(resource) ? 'me/' : '') ;
 
   /**
    * Verificamos si existe code en el
@@ -270,7 +271,7 @@ oauth2.prototype.query = function(method, query, action) {
   action = action || this._createAction();
 
   var self = this;
-  var url  = this.set.resource + '/_api/v1.0/' + query;
+  var url  = this.set.resource + this.path + query;
 
   var xhr = new XMLHttpRequest();
   xhr.open(method, url, true);
@@ -350,9 +351,16 @@ oauth2.prototype.createFolder = function(parentId, folderName) {
 /**
  * @public function
  */
-oauth2.prototype.getDownload = function(id, name, noRepeat) {
+oauth2.prototype.delFile = function(fileId) {
+  return this.query('DELETE', 'files/'+fileId);
+}
+
+/**
+ * @public function
+ */
+oauth2.prototype.getDownload = function(id, name) {
   var self = this;
-  var url  = this.set.resource + '/_api/v1.0/files/'+id+'/content';
+  var url  = this.set.resource + this.path + 'files/'+id+'/content';
 
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
@@ -381,7 +389,7 @@ oauth2.prototype.getDownload = function(id, name, noRepeat) {
   }
   xhr.onerror = function(e) {
     if (!noRepeat) {
-      self._refreshToken(function() { self.getDownload(id, true); });
+      self._refreshToken(function() { self.getDownload(id); });
       return;
     }
   }
