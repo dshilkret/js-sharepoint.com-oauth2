@@ -18,8 +18,6 @@ var oauth2 = window.Oauth2 = function(namespace) {
   s['grant_type']    = 'authorization_code';
 }
 
-oauth2.prototype.version = "v0.1";
-
 /**
  * @private function
  */
@@ -346,6 +344,40 @@ oauth2.prototype.getChildren = function(id) {
  */
 oauth2.prototype.createFolder = function(parentId, folderName) {
   return this.query('PUT', 'files/'+parentId+'/children/'+folderName);
+}
+
+/**
+ * @public function
+ */
+oauth2.prototype.sendFile = function(parentId, name, file, fnProgress, action) {
+  fnProgress = fnProgress || function() {};
+  action = action || this._createAction();
+
+  var self = this;
+  var url  = this.set.resource + this.path + 'files/'+parentId+'/children/'+name+'/content';
+  
+  var xhr  = new XMLHttpRequest();
+  xhr.open('PUT', url, true);
+  xhr.setRequestHeader('Authorization', this.typeToken+' '+this.accessToken);
+
+  xhr.upload.onprogress = function(e) {
+    fnProgress.call(self, (e.loaded/e.total) * 100, e);
+  }
+
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      action.callThenFns(self, [JSON.parse(xhr.response)]);
+      return;
+    }
+  }
+
+  xhr.onerror = function(e) {
+    self._refreshToken(function() { self.createFolder(parentId, name, file, fnProgress, action); });
+  }
+
+  xhr.send(file);
+
+  return action
 }
 
 /**
