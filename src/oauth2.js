@@ -122,6 +122,19 @@ oauth2.prototype._getTokenData = function(auth, code) {
  */
 oauth2.prototype._refreshToken = function(callback) {
   var self = this;
+
+  if (!this.token) {
+    var action = this._createAction();
+    action.then(function() { self._refreshToken(callback); });
+    this.getToken(this.set['resource'], action);
+    return;
+  }
+
+  if (this.token['expires_on'] > new Date()) {
+    callback.call(this);
+    return;
+  }
+
   var xhr  = new XMLHttpRequest();
   xhr.open('POST', this.set['refresh_token'], true);
   xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8');
@@ -273,10 +286,10 @@ oauth2.prototype.query = function(method, query, action) {
   var self = this;
 
   /**
-   * Validamos que el token no este expirado, sino
+   * Validamos que el token no haya expirado, sino
    * pedimos un nuevo token.
    */
-  if (new Date() >= this.token['expires_on']) {
+  if (!this.token || new Date() >= this.token['expires_on']) {
     this._refreshToken(function() { self.query(method, query, action); });
     return action;
   }
