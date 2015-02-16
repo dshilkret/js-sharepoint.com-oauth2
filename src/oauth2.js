@@ -128,13 +128,13 @@ oauth2.prototype._refreshToken = function(callback) {
 
   xhr.onload = function() {
     if (xhr.status !== 200) return;
-    self._updateToken(JSON.parse(xhr.response));
+    self._updateToken(xhr.response);
     callback.call(self);
   }
 
   var data = {};
   data['grant_type']    = 'refresh_token';
-  data['refresh_token'] = this.refreshToken;
+  data['refresh_token'] = this.token['refresh_token'];
   data['resource']      = this.set['resource'];
   data['client_id']     = this.set['client_id'];
   data['client_secret'] = this.set['client_secret'];
@@ -143,17 +143,27 @@ oauth2.prototype._refreshToken = function(callback) {
   xhr.send(params);
 }
 
+oauth2.prototype._getTokenObject = function(response) {
+  if (!response) return null;
+
+  return JSON.parse(response, function(k, v) {
+    if (k === 'expires_on') {
+      return new Date(parseInt(v*1000));
+    }
+    if (k === 'not_before') {
+      return new Date(parseInt(v*1000));
+    }
+
+    return v;
+  });
+}
+
 /**
  * @private function
  */
-oauth2.prototype._updateToken = function(data) {
-  var accessname  = 'access_'  + this.namespace;
-  var typename    = 'type_'    + this.namespace;
-  var refreshname = 'refresh_' + this.namespace;
-
-  this.accessToken  = localStorage[accessname]  = data['access_token'];
-  this.refreshToken = localStorage[refreshname] = data['refresh_token'];
-  this.typeToken    = localStorage[typename]    = data['token_type'];
+oauth2.prototype._updateToken = function(response) {
+  localStorage['access_' + this.namespace] = response;
+  this.token = this._getTokenObject(response);
 }
 
 /**
@@ -165,27 +175,19 @@ oauth2.prototype._updateToken = function(data) {
  * hara el trabajo.
  */
 oauth2.prototype._getAccessToken = function(code, action) {
-  var self = this;
+  var self  = this;
+  var token = this.token = this._getTokenObject(localStorage['access_' + this.namespace]);
 
-  var accessname  = 'access_'  + this.namespace;
-  var typename    = 'type_'    + this.namespace;
-  var refreshname = 'refresh_' + this.namespace;
-
-  var accessToken  = this.accessToken  = localStorage[accessname];
-  var typeToken    = this.typeToken    = localStorage[typename];
-  var refreshToken = this.refreshToken = localStorage[refreshname];
-
-  if (!accessToken || !typeToken || !refreshToken) {
+  if (!token) {
     var xhr = new XMLHttpRequest();
     xhr.open('POST', this.set['access_token'], true);
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8');
 
     xhr.onload = function() {
       if (xhr.status !== 200) return;
-      self._updateToken(JSON.parse(xhr.response));
-      accessToken = this.accessToken;
-      typeToken   = this.typeToken;
-      action.callThenFns(self, [accessToken, typeToken]);
+      self._updateToken(xhr.response);
+      token = self.token;
+      action.callThenFns(self, [token]);
     }
 
     xhr.onerror = function() {
@@ -201,7 +203,7 @@ oauth2.prototype._getAccessToken = function(code, action) {
   }
 
   setTimeout(function() {
-    action.callThenFns(self, [accessToken, typeToken]);
+    action.callThenFns(self, [token]);
   }, 100);
 }
 
@@ -269,11 +271,21 @@ oauth2.prototype.query = function(method, query, action) {
   action = action || this._createAction();
 
   var self = this;
+
+  /**
+   * Validamos que el token no este expirado, sino
+   * pedimos un nuevo token.
+   */
+  if (new Date() >= this.token['expires_on']) {
+    this._refreshToken(function() { self.query(method, query, action); });
+    return action;
+  }
+
   var url  = this.set.resource + this.path + query;
 
   var xhr = new XMLHttpRequest();
   xhr.open(method, url, true);
-  xhr.setRequestHeader('Authorization', this.typeToken+' '+this.accessToken);
+  xhr.setRequestHeader('Authorization', this.token['token_type']+' '+this.token['access_token']);
   xhr.setRequestHeader('Accept', 'application/json');
   xhr.onload = function() {
     if (xhr.status === 200) {
@@ -307,22 +319,11 @@ oauth2.prototype.query = function(method, query, action) {
  * @public function
  */
 oauth2.prototype.clear = function() {
-  var accessname  = 'access_'  + this.namespace;
-  var typename    = 'type_'    + this.namespace;
-  var refreshname = 'refresh_' + this.namespace;
-  var codename    = 'code_'    + self.namespace;
-
-  localStorage.removeItem(codename);
+  localStorage.removeItem('code_' + this.namespace);
   delete this.code;
 
-  localStorage.removeItem(accessname);
-  delete self.accessToken;
-
-  localStorage.removeItem(typename);
-  delete self.typeToken;
-
-  localStorage.removeItem(refreshname);
-  delete self.refreshToken;
+  localStorage.removeItem('access_' + this.namespace);
+  delete this.token;
 }
 
 /**
@@ -354,11 +355,21 @@ oauth2.prototype.sendFile = function(parentId, name, file, fnProgress, action) {
   action = action || this._createAction();
 
   var self = this;
+
+  /**
+   * Validamos que el token no este expirado, sino
+   * pedimos un nuevo token.
+   */
+  if (new Date() >= this.token['expires_on']) {
+    this._refreshToken(function() { self.createFolder(parentId, name, file, fnProgress, action); });
+    return action;
+  }
+
   var url  = this.set.resource + this.path + 'files/'+parentId+'/children/'+name+'/content';
   
   var xhr  = new XMLHttpRequest();
   xhr.open('PUT', url, true);
-  xhr.setRequestHeader('Authorization', this.typeToken+' '+this.accessToken);
+  xhr.setRequestHeader('Authorization', this.token['token_type']+' '+this.token['access_token']);
 
   xhr.upload.onprogress = function(e) {
     fnProgress.call(self, (e.loaded/e.total) * 100, e);
@@ -392,12 +403,22 @@ oauth2.prototype.delFile = function(fileId) {
  */
 oauth2.prototype.getDownload = function(id, name) {
   var self = this;
+
+  /**
+   * Validamos que el token no este expirado, sino
+   * pedimos un nuevo token.
+   */
+  if (new Date() >= this.token['expires_on']) {
+    this._refreshToken(function() { self.getDownload(id, name); });
+    return this;
+  }
+
   var url  = this.set.resource + this.path + 'files/'+id+'/content';
 
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
   xhr.responseType = 'blob';
-  xhr.setRequestHeader('Authorization', this.typeToken+' '+this.accessToken);
+  xhr.setRequestHeader('Authorization', this.token['token_type']+' '+this.token['access_token']);
 
   xhr.onload = function() {
     if (xhr.status === 200) {
@@ -421,7 +442,7 @@ oauth2.prototype.getDownload = function(id, name) {
   }
   xhr.onerror = function(e) {
     if (!noRepeat) {
-      self._refreshToken(function() { self.getDownload(id); });
+      self._refreshToken(function() { self.getDownload(id, name); });
       return;
     }
   }
