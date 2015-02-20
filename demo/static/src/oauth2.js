@@ -356,6 +356,13 @@ oauth2.prototype.getChildren = function(id) {
 /**
  * @public function
  */
+oauth2.prototype.getByPath = function(path) {
+  return this.query('GET', 'files/getByPath(\'' + path + '\')');
+}
+
+/**
+ * @public function
+ */
 oauth2.prototype.createFolder = function(parentId, folderName) {
   return this.query('PUT', 'files/'+parentId+'/children/'+folderName);
 }
