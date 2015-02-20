@@ -305,6 +305,11 @@ oauth2.prototype.query = function(method, query, action) {
       action.callThenFns(self, [JSON.parse(xhr.response)]);
       return;
     }
+    // No se encontró carpeta o archivo
+    if (xhr.status === 400 || xhr.status === 404 ) {
+      action.callElseFns(self, [xhr.status, JSON.parse(xhr.response)]);
+      return;
+    }
   }
 
   xhr.onreadystatechange = function(e) {
