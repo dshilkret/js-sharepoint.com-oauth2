@@ -79,7 +79,7 @@ oauth2.prototype._getCodeUrl = function(setting) {
  * @private function
  */
 oauth2.prototype._getTokenForm = function(setting, code, url) {
-  var enconde = this._getParamForm('url', url);
+  var enconde = url ? this._getParamForm('url', url) : '';
 
   for (var key in setting) {
     enconde += this._getParamForm(key, setting[key]);
@@ -182,6 +182,44 @@ oauth2.prototype._updateToken = function(response) {
 /**
  * @private function
 
+ * Implementacion no funcional
+ * del access token.
+ */
+oauth2.prototype._getAccessTokenDirect = function(code, action) {
+  var self  = this;
+  var token = this.token = this._getTokenObject(localStorage['access_' + this.namespace]);
+
+  if (!token) {
+    var url = this.set['authorization']+'/'+this.set['token'];
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8');
+
+    xhr.onload = function() {
+      if (xhr.status !== 200) return;
+      self._updateToken(xhr.response);
+      token = self.token;
+      action.callThenFns(self, [token]);
+    }
+
+    xhr.onerror = function() {
+      action.callFailFns(self, []);
+    }
+
+    var params = this._getAccessTokenForm(this.set, code);
+    xhr.send(params);
+
+    return;
+  }
+
+  setTimeout(function() {
+    action.callThenFns(self, [token]);
+  }, 100);
+}
+
+/**
+ * @private function
+
  * Debido a problemas con el Cross-Domain
  * no podemos pedir el token de
  * acceso desde el navegador, asi que un proxy
@@ -226,18 +264,18 @@ oauth2.prototype._getAccessToken = function(code, action) {
 oauth2.prototype._createAction = function() {
   var a = {};
   a.thenFns = [];
-  a.elseFns = [];
+  a.failFns = [];
   a.then = function(fn) { this.thenFns.push(fn); return this; }
-  a.else = function(fn) { this.elseFns.push(fn); return this; }
+  a.fail = function(fn) { this.failFns.push(fn); return this; }
 
   a.callThenFns = function(scope, args) {
     args = args || [];
     this.thenFns.forEach(function(fn) { fn.apply(scope, args); });
   }
 
-  a.callElseFns = function(scope, args) {
+  a.callFailFns = function(scope, args) {
     args = args || [];
-    this.elseFns.forEach(function(fn) { fn.apply(scope, args); });
+    this.failFns.forEach(function(fn) { fn.apply(scope, args); });
   }
 
   return a;
@@ -307,7 +345,13 @@ oauth2.prototype.query = function(method, query, action) {
     }
     // No se encontró carpeta o archivo
     if (xhr.status === 400 || xhr.status === 404 ) {
-      action.callElseFns(self, [xhr.status, JSON.parse(xhr.response)]);
+      action.callFailFns(self, [xhr.status, JSON.parse(xhr.response)]);
+      return;
+    }
+
+    // Sin permisos
+    if (xhr.status === 403) {
+      self._refreshToken(function() { self.query(method, query, action); });
       return;
     }
   }
@@ -317,15 +361,13 @@ oauth2.prototype.query = function(method, query, action) {
      * No tiene privilegios para ejecutar
      * esta opción.
      */
-    if (e.target.readyState === 4 && e.target.status === 401) {
-      action.callElseFns(self, [e]);
+    if (xhr.readyState === 4 && xhr.status === 401) {
+      action.callFailFns(self, [e]);
+      return;
     }
   }
 
   xhr.onerror = function(e) {
-    /**
-     * 
-     */
     self._refreshToken(function() { self.query(method, query, action); });
   }
   xhr.send();
