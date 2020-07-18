@@ -109,7 +109,7 @@
 
       function fnConnect() {
         oauth2 = new Oauth2('sharepoint');
-        oauth2.setting(
+       /* oauth2.setting(
           {
             'client_id':     'c8521d2b-f57d-4e9f-aa5c-9b7c8824fd6d',
             'client_secret': 'Y52jyW+dHig6JcC8QazLmR2e3+dHlGCIVEaxIE2pgDg=',
@@ -117,9 +117,18 @@
             'access_token':  'accessToken/',
             'refresh_token': 'refreshToken/'
           }
+        );*/arguments
+        oauth2.setting(
+          {
+            'client_id':     '0815b6f7-bbc6-4d28-a2a0-ffbb50eebd3b',
+            'client_secret': 'SfOpD+o/ppgQg97+RG54d89QahHc3OE3cNpcx89EqPE=',
+            'redirect_uri':  'http://localhost:8080/response',
+            'access_token':  'accessToken/',
+            'refresh_token': 'refreshToken/'
+          }
         );
 
-        oauth2.getToken('https://mrisk.sharepoint.com')
+        oauth2.getToken('https://splmdnw57xg3ppq.eastus2.cloudapp.azure.com')
           .then(
             function() {
               this.getRoot()
