@@ -117,18 +117,26 @@
             'access_token':  'accessToken/',
             'refresh_token': 'refreshToken/'
           }
-        );*/arguments
+        );arguments
         oauth2.setting(
           {
-            'client_id':     '0815b6f7-bbc6-4d28-a2a0-ffbb50eebd3b',
+            'client_id':     'a15ebaf4-cd99-4fc3-8b46-34ee2d29a6a7',
             'client_secret': 'SfOpD+o/ppgQg97+RG54d89QahHc3OE3cNpcx89EqPE=',
             'redirect_uri':  'http://localhost:8080/response',
             'access_token':  'accessToken/',
             'refresh_token': 'refreshToken/'
           }
+        );*/
+        oauth2.setting(
+          {
+            'client_id':     'a15ebaf4-cd99-4fc3-8b46-34ee2d29a6a7',
+            'client_secret': 'lRw7pPhKuWRMjK3dHHQ0KI2hl5YNVS4HDohherUCouE=',
+            'redirect_uri':  'http://localhost:8080/response',
+            'access_token':  'accessToken/',
+            'refresh_token': 'refreshToken/'
+          }
         );
-
-        oauth2.getToken('https://splmdnw57xg3ppq.eastus2.cloudapp.azure.com')
+        oauth2.getToken('https://spwzb27rov2c3sm.eastus2.cloudapp.azure.com/')
           .then(
             function() {
               this.getRoot()
